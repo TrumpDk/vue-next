@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Vue源码学习</title>
+        <script src="../dist/vue.global.js"></script>
+    </head>
+    <body>
+        <div id="app">
+            <h1>{{state}}</h1>
+        </div>
+        <script>
+            const { ref, createApp} = Vue;
+            
+            const app = Vue.createApp({
+                setup() {
+                    const state = ref('message');
+
+                    setTimeout(() => state.value = state.value.split('').reverse().join(''), 1000);
+                    return {
+                        state
+                    }
+                }
+            }).mount('#app')
+        </script>
+    </body>
+</html>

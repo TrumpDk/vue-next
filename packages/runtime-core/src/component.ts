@@ -641,6 +641,7 @@ function setupStatefulComponent(
     resetTracking()
     unsetCurrentInstance()
 
+    //目前来说暂不支持promise，此处应该是给未来留下拓展地方，主要还是后面的逻辑
     if (isPromise(setupResult)) {
       setupResult.then(unsetCurrentInstance, unsetCurrentInstance)
 
@@ -676,6 +677,7 @@ export function handleSetupResult(
   setupResult: unknown,
   isSSR: boolean
 ) {
+  //判断是否为函数，有两种情况，一是ssr,二是此处setup可能返回的是render函数，此处为处理这两种情况的逻辑
   if (isFunction(setupResult)) {
     // setup returned an inline render function
     if (__NODE_JS__ && (instance.type as ComponentOptions).__ssrInlineRender) {
@@ -685,7 +687,9 @@ export function handleSetupResult(
     } else {
       instance.render = setupResult as InternalRenderFunction
     }
+  // 此分支就是处理一般情况的逻辑
   } else if (isObject(setupResult)) {
+    // setup不能返回vnode
     if (__DEV__ && isVNode(setupResult)) {
       warn(
         `setup() should not return VNodes directly - ` +
@@ -697,6 +701,7 @@ export function handleSetupResult(
     if (__DEV__ || __FEATURE_PROD_DEVTOOLS__) {
       instance.devtoolsRawSetupState = setupResult
     }
+    // 存疑 暂时不知道此处代理的啥
     instance.setupState = proxyRefs(setupResult)
     if (__DEV__) {
       exposeSetupStateOnRenderContext(instance)
@@ -708,6 +713,7 @@ export function handleSetupResult(
       }`
     )
   }
+  // 然后进入下一步
   finishComponentSetup(instance, isSSR)
 }
 
@@ -770,6 +776,7 @@ export function finishComponentSetup(
         Component.template
       if (template) {
         if (__DEV__) {
+          // 衡量vue性能的代码 有空了研究 此处略过
           startMeasure(instance, `compile`)
         }
         const { isCustomElement, compilerOptions } = instance.appContext.config
@@ -792,6 +799,7 @@ export function finishComponentSetup(
             extend(finalCompilerOptions.compatConfig, Component.compatConfig)
           }
         }
+        //关键点， template变render函数（此处setup没有render才会触发）
         Component.render = compile(template, finalCompilerOptions)
         if (__DEV__) {
           endMeasure(instance, `compile`)
