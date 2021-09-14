@@ -17,6 +17,7 @@ function compileToFunction(
   template: string | HTMLElement,
   options?: CompilerOptions
 ): RenderFunction {
+  // 判断template是不是字符串，不是就当作dom节点处理
   if (!isString(template)) {
     if (template.nodeType) {
       template = template.innerHTML
@@ -26,12 +27,14 @@ function compileToFunction(
     }
   }
 
+  // 有缓存则使用缓存
   const key = template
   const cached = compileCache[key]
   if (cached) {
     return cached
   }
 
+  // 如果传入的是id，则通过querySelector选取
   if (template[0] === '#') {
     const el = document.querySelector(template)
     if (__DEV__ && !el) {
@@ -48,6 +51,7 @@ function compileToFunction(
     warnDeprecation(DeprecationTypes.CONFIG_WHITESPACE, null)
   }
 
+  //compile生成code
   const { code } = compile(
     template,
     extend(
@@ -79,6 +83,7 @@ function compileToFunction(
   // with keys that cannot be mangled, and can be quite heavy size-wise.
   // In the global build we know `Vue` is available globally so we can avoid
   // the wildcard object.
+  // 将生成的render字符串转换为render函数
   const render = (
     __GLOBAL__ ? new Function(code)() : new Function('Vue', code)(runtimeDom)
   ) as RenderFunction
@@ -86,6 +91,7 @@ function compileToFunction(
   // mark the function as runtime compiled
   ;(render as InternalRenderFunction)._rc = true
 
+  // 将
   return (compileCache[key] = render)
 }
 

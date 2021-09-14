@@ -641,7 +641,7 @@ function setupStatefulComponent(
     resetTracking()
     unsetCurrentInstance()
 
-    //目前来说暂不支持promise，此处应该是给未来留下拓展地方，主要还是后面的逻辑
+    //此处主要是ssr会用到
     if (isPromise(setupResult)) {
       setupResult.then(unsetCurrentInstance, unsetCurrentInstance)
 
@@ -687,7 +687,7 @@ export function handleSetupResult(
     } else {
       instance.render = setupResult as InternalRenderFunction
     }
-  // 此分支就是处理一般情况的逻辑
+    // 此分支就是处理一般情况的逻辑
   } else if (isObject(setupResult)) {
     // setup不能返回vnode
     if (__DEV__ && isVNode(setupResult)) {
@@ -799,7 +799,7 @@ export function finishComponentSetup(
             extend(finalCompilerOptions.compatConfig, Component.compatConfig)
           }
         }
-        //关键点， template变render函数（此处setup没有render才会触发）
+        //关键点， template变render函数（此处setup没有返回render函数才会触发）
         Component.render = compile(template, finalCompilerOptions)
         if (__DEV__) {
           endMeasure(instance, `compile`)
@@ -816,7 +816,7 @@ export function finishComponentSetup(
       installWithProxy(instance)
     }
   }
-
+  //
   // support for 2.x options
   if (__FEATURE_OPTIONS_API__ && !(__COMPAT__ && skipOptions)) {
     setCurrentInstance(instance)

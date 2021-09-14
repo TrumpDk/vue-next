@@ -386,6 +386,7 @@ function baseCreateRenderer(
       n1 = null
     }
 
+    // 当patchFlag为BAIL时，此时需要关闭优化策略，后面patch就需要进行全量patch
     if (n2.patchFlag === PatchFlags.BAIL) {
       optimized = false
       n2.dynamicChildren = null
@@ -822,13 +823,16 @@ function baseCreateRenderer(
     // #1426 take the old vnode's patch flag into account since user may clone a
     // compiler-generated vnode, which de-opts to FULL_PROPS
     patchFlag |= n1.patchFlag & PatchFlags.FULL_PROPS
+    // 首先提取新老节点props属性
     const oldProps = n1.props || EMPTY_OBJ
     const newProps = n2.props || EMPTY_OBJ
     let vnodeHook: VNodeHook | undefined | null
 
+    // 触发vnode钩子 onVnodeBeforeUpdate
     if ((vnodeHook = newProps.onVnodeBeforeUpdate)) {
       invokeVNodeHook(vnodeHook, parentComponent, n2, n1)
     }
+    // 触发指令的钩子beforeUpdate
     if (dirs) {
       invokeDirectiveHook(n2, n1, parentComponent, 'beforeUpdate')
     }
@@ -1775,6 +1779,7 @@ function baseCreateRenderer(
     let e1 = c1.length - 1 // prev ending index
     let e2 = l2 - 1 // next ending index
 
+    // 从首部开始寻找，patch，直到不是相同节点，跳出循环
     // 1. sync from start
     // (a b) c
     // (a b) d e
@@ -1801,6 +1806,7 @@ function baseCreateRenderer(
       i++
     }
 
+    // 从尾部开始寻找，patch，直到不是相同节点，退出循环
     // 2. sync from end
     // a (b c)
     // d e (b c)
@@ -1828,6 +1834,7 @@ function baseCreateRenderer(
       e2--
     }
 
+    // 此时假定，旧节点找完了，然后将剩下的新节点patch，mount上去
     // 3. common sequence + mount
     // (a b)
     // (a b) c
@@ -1857,7 +1864,7 @@ function baseCreateRenderer(
         }
       }
     }
-
+    // 此时假定新节点先patch完毕，剩下的老节点都要unmount
     // 4. common sequence + unmount
     // (a b) c
     // (a b)
@@ -1872,6 +1879,7 @@ function baseCreateRenderer(
       }
     }
 
+    // 非理想状态下，如果从中间改变了节点位置和长度，走这个逻辑
     // 5. unknown sequence
     // [i ... e1 + 1]: a b [c d e] f g
     // [i ... e2 + 1]: a b [e d c h] f g
@@ -1880,6 +1888,7 @@ function baseCreateRenderer(
       const s1 = i // prev starting index
       const s2 = i // next starting index
 
+      // 首先创建新节点的缓存Map，用于后面寻找相同节点使用 <key, index>类型
       // 5.1 build key:index map for newChildren
       const keyToNewIndexMap: Map<string | number | symbol, number> = new Map()
       for (i = s2; i <= e2; i++) {
@@ -1911,9 +1920,11 @@ function baseCreateRenderer(
       // and oldIndex = 0 is a special value indicating the new node has
       // no corresponding old node.
       // used for determining longest stable subsequence
+      // 创建老节点的缓存map，并且每个index对应的value都设置为0
       const newIndexToOldIndexMap = new Array(toBePatched)
       for (i = 0; i < toBePatched; i++) newIndexToOldIndexMap[i] = 0
 
+      // 便利老节点
       for (i = s1; i <= e1; i++) {
         const prevChild = c1[i]
         if (patched >= toBePatched) {
@@ -1923,8 +1934,10 @@ function baseCreateRenderer(
         }
         let newIndex
         if (prevChild.key != null) {
+          // 这里是试图通过旧节点的key找到新节点相同的节点
           newIndex = keyToNewIndexMap.get(prevChild.key)
         } else {
+          // 如果老节点的key不在，则遍历新节点，通过sameVnode方法找到对应的同一节点
           // key-less node, try to locate a key-less node of the same type
           for (j = s2; j <= e2; j++) {
             if (
@@ -1936,6 +1949,7 @@ function baseCreateRenderer(
             }
           }
         }
+        // 没找到老节点对应的新节点，就卸载掉老节点
         if (newIndex === undefined) {
           unmount(prevChild, parentComponent, parentSuspense, true)
         } else {

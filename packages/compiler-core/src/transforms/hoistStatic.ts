@@ -68,6 +68,7 @@ function walk(
 
   for (let i = 0; i < children.length; i++) {
     const child = children[i]
+    // 只有普通元素和文本能够提升
     // only plain elements & text calls are eligible for hoisting.
     if (
       child.type === NodeTypes.ELEMENT &&

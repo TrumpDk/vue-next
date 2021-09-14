@@ -431,6 +431,7 @@ export function traverseNode(
     }
   }
 
+  // 根据不同节点类型 call 不同helper
   switch (node.type) {
     case NodeTypes.COMMENT:
       if (!context.ssr) {
@@ -446,12 +447,14 @@ export function traverseNode(
       }
       break
 
+    // 递归
     // for container types, further traverse downwards
     case NodeTypes.IF:
       for (let i = 0; i < node.branches.length; i++) {
         traverseNode(node.branches[i], context)
       }
       break
+    // 以下case都去触发children
     case NodeTypes.IF_BRANCH:
     case NodeTypes.FOR:
     case NodeTypes.ELEMENT:

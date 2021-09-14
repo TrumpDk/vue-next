@@ -155,18 +155,22 @@ function parseChildren(
     let node: TemplateChildNode | TemplateChildNode[] | undefined = undefined
 
     if (mode === TextModes.DATA || mode === TextModes.RCDATA) {
+      // 处理插值表达式
       if (!context.inVPre && startsWith(s, context.options.delimiters[0])) {
         // '{{'
         node = parseInterpolation(context, mode)
       } else if (mode === TextModes.DATA && s[0] === '<') {
+        // 处理属于节点元素部分的逻辑
         // https://html.spec.whatwg.org/multipage/parsing.html#tag-open-state
         if (s.length === 1) {
           emitError(context, ErrorCodes.EOF_BEFORE_TAG_NAME, 1)
         } else if (s[1] === '!') {
+          // 处理注释
           // https://html.spec.whatwg.org/multipage/parsing.html#markup-declaration-open-state
           if (startsWith(s, '<!--')) {
             node = parseComment(context)
           } else if (startsWith(s, '<!DOCTYPE')) {
+            // 解析文档声明
             // Ignore DOCTYPE by a limitation.
             node = parseBogusComment(context)
           } else if (startsWith(s, '<![CDATA[')) {
@@ -189,6 +193,7 @@ function parseChildren(
             advanceBy(context, 3)
             continue
           } else if (/[a-z]/i.test(s[2])) {
+            // 解析标签，此处会解析attr
             emitError(context, ErrorCodes.X_INVALID_END_TAG)
             parseTag(context, TagType.End, parent)
             continue
@@ -201,6 +206,7 @@ function parseChildren(
             node = parseBogusComment(context)
           }
         } else if (/[a-z]/i.test(s[1])) {
+          // 解析元素节点
           node = parseElement(context, ancestors)
 
           // 2.x <template> with no directive compat
@@ -239,6 +245,7 @@ function parseChildren(
       }
     }
     if (!node) {
+      // 解析普通文本
       node = parseText(context, mode)
     }
 
@@ -425,6 +432,7 @@ function parseElement(
   const isPreBoundary = context.inPre && !wasInPre
   const isVPreBoundary = context.inVPre && !wasInVPre
 
+  // 自闭和标签如<img> <br> <hr>则直接返回
   if (element.isSelfClosing || context.options.isVoidTag(element.tag)) {
     // #4030 self-closing <pre> tag
     if (isPreBoundary) {
@@ -436,6 +444,7 @@ function parseElement(
     return element
   }
 
+  // 递归解析子节点
   // Children.
   ancestors.push(element)
   const mode = context.options.getTextMode(element, parent)
@@ -466,6 +475,7 @@ function parseElement(
 
   element.children = children
 
+  //解析结束标签
   // End tag.
   if (startsWithEndTagOpen(context.source, element.tag)) {
     parseTag(context, TagType.End, parent)
@@ -479,6 +489,7 @@ function parseElement(
     }
   }
 
+  // 获取标签位置对象
   element.loc = getSelection(context, element.loc.start)
 
   if (isPreBoundary) {
@@ -525,10 +536,12 @@ function parseTag(
 
   // Tag open.
   const start = getCursor(context)
+  // 匹配标签名
   const match = /^<\/?([a-z][^\t\r\n\f />]*)/i.exec(context.source)!
   const tag = match[1]
   const ns = context.options.getNamespace(tag, parent)
 
+  // 截断字符串
   advanceBy(context, match[0].length)
   advanceSpaces(context)
 
@@ -541,10 +554,14 @@ function parseTag(
     context.inPre = true
   }
 
+  // 解析attr，存储到props属性
   // Attributes.
   let props = parseAttributes(context, type)
 
   // check v-pre
+  // 判断props type是否directive name是否pre
+  // 是的话inVpre为true
+  // 过滤v-pre
   if (
     type === TagType.Start &&
     !context.inVPre &&
@@ -558,6 +575,8 @@ function parseTag(
     props = parseAttributes(context, type).filter(p => p.name !== 'v-pre')
   }
 
+  // 解析闭合处
+  // 判断是否为自闭合标签，是的话打上isSelfClosing tag
   // Tag close.
   let isSelfClosing = false
   if (context.source.length === 0) {
@@ -604,6 +623,7 @@ function parseTag(
     }
   }
 
+  // 判断标签类型是否是元素、插槽、组件
   let tagType = ElementTypes.ELEMENT
   if (!context.inVPre) {
     if (tag === 'slot') {
@@ -622,6 +642,7 @@ function parseTag(
     }
   }
 
+  // 返回ast
   return {
     type: NodeTypes.ELEMENT,
     ns,
