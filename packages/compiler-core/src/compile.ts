@@ -87,6 +87,14 @@ export function baseCompile(
   const [nodeTransforms, directiveTransforms] =
     getBaseTransformPreset(prefixIdentifiers)
   // patchFlage节点优化在此处进行
+
+  if (!__BROWSER__ && options.isTS) {
+    const { expressionPlugins } = options
+    if (!expressionPlugins || !expressionPlugins.includes('typescript')) {
+      options.expressionPlugins = [...(expressionPlugins || []), 'typescript']
+    }
+  }
+
   transform(
     ast,
     extend({}, options, {
