@@ -9,6 +9,7 @@ import {
   newTracked,
   wasTracked
 } from './dep'
+import { ComputedRefImpl } from './computed'
 
 // The main WeakMap that stores {target -> key -> dep} connections.
 // Conceptually, it's easier to think of a dependency as a Dep class
@@ -44,7 +45,6 @@ export type DebuggerEventExtraInfo = {
   oldTarget?: Map<any, any> | Set<any>
 }
 
-const effectStack: ReactiveEffect[] = []
 let activeEffect: ReactiveEffect | undefined
 
 export const ITERATE_KEY = Symbol(__DEV__ ? 'iterate' : '')
@@ -53,10 +53,18 @@ export const MAP_KEY_ITERATE_KEY = Symbol(__DEV__ ? 'Map key iterate' : '')
 export class ReactiveEffect<T = any> {
   active = true
   deps: Dep[] = []
+  parent: ReactiveEffect | undefined = undefined
 
-  // can be attached after creation
-  computed?: boolean
+  /**
+   * Can be attached after creation
+   * @internal
+   */
+  computed?: ComputedRefImpl<T>
+  /**
+   * @internal
+   */
   allowRecurse?: boolean
+
   onStop?: () => void
   // dev only
   onTrack?: (event: DebuggerEvent) => void
@@ -66,7 +74,7 @@ export class ReactiveEffect<T = any> {
   constructor(
     public fn: () => T,
     public scheduler: EffectScheduler | null = null,
-    scope?: EffectScope | null
+    scope?: EffectScope
   ) {
     recordEffectScope(this, scope)
   }
@@ -75,31 +83,37 @@ export class ReactiveEffect<T = any> {
     if (!this.active) {
       return this.fn()
     }
-    if (!effectStack.includes(this)) {
-      try {
-        effectStack.push((activeEffect = this))
-        enableTracking()
-
-        trackOpBit = 1 << ++effectTrackDepth
-
-        if (effectTrackDepth <= maxMarkerBits) {
-          initDepMarkers(this)
-        } else {
-          cleanupEffect(this)
-        }
-        return this.fn()
-      } finally {
-        if (effectTrackDepth <= maxMarkerBits) {
-          finalizeDepMarkers(this)
-        }
-
-        trackOpBit = 1 << --effectTrackDepth
-
-        resetTracking()
-        effectStack.pop()
-        const n = effectStack.length
-        activeEffect = n > 0 ? effectStack[n - 1] : undefined
+    let parent: ReactiveEffect | undefined = activeEffect
+    let lastShouldTrack = shouldTrack
+    while (parent) {
+      if (parent === this) {
+        return
       }
+      parent = parent.parent
+    }
+    try {
+      this.parent = activeEffect
+      activeEffect = this
+      shouldTrack = true
+
+      trackOpBit = 1 << ++effectTrackDepth
+
+      if (effectTrackDepth <= maxMarkerBits) {
+        initDepMarkers(this)
+      } else {
+        cleanupEffect(this)
+      }
+      return this.fn()
+    } finally {
+      if (effectTrackDepth <= maxMarkerBits) {
+        finalizeDepMarkers(this)
+      }
+
+      trackOpBit = 1 << --effectTrackDepth
+
+      activeEffect = this.parent
+      shouldTrack = lastShouldTrack
+      this.parent = undefined
     }
   }
 
@@ -206,7 +220,7 @@ export function track(target: object, type: TrackOpTypes, key: unknown) {
 }
 
 export function isTracking() {
-  return shouldTrack && activeEffect !== undefined
+  return shouldTrack && !!activeEffect
 }
 
 export function trackEffects(
